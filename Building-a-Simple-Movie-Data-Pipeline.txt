@@ -283,6 +283,6 @@ Add Airflow or Prefect orchestration for automation.
 Prepared for tsworks Data Engineering Assignment.
 
 
----
 
-Would you like me to **bundle all these files** into a ready-to-download `.zip` project (so you can run or upload it to GitHub right away)?
+
+
