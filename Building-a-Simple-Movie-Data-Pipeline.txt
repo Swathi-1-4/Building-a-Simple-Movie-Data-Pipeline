@@ -45,25 +45,20 @@ year extracted from OMDb or title (if not available).
 
 Foreign key ensures referential integrity.
 
-🧠 2. etl.py
-
-This is the main ETL pipeline script.
-
-# etl.py
+# 🎬 etl.py 
 import pandas as pd
 import requests
-import sqlite3
 import time
 from sqlalchemy import create_engine, text
 
-# ========== CONFIG ==========
+# ================= CONFIG =================
 MOVIES_CSV = "movies.csv"
 RATINGS_CSV = "ratings.csv"
-OMDB_API_KEY = "YOUR_API_KEY"  # Replace with your OMDb API key
+OMDB_API_KEY = "YOUR_API_KEY"   # 🔑 Replace this with your actual OMDb API key
 DB_NAME = "movies.db"
 OMDB_URL = "http://www.omdbapi.com/"
+# ==========================================
 
-# ============================
 
 def get_omdb_data(title):
     """Fetch movie details from OMDb API."""
@@ -73,61 +68,82 @@ def get_omdb_data(title):
         data = response.json()
         if data.get("Response") == "True":
             return {
-                "Director": data.get("Director", None),
-                "Plot": data.get("Plot", None),
-                "BoxOffice": data.get("BoxOffice", None),
-                "Year": data.get("Year", None)
+                "director": data.get("Director"),
+                "plot": data.get("Plot"),
+                "box_office": data.get("BoxOffice"),
+                "year": data.get("Year")
             }
         else:
-            return {"Director": None, "Plot": None, "BoxOffice": None, "Year": None}
+            return {"director": None, "plot": None, "box_office": None, "year": None}
     except Exception as e:
-        print(f"API error for {title}: {e}")
-        return {"Director": None, "Plot": None, "BoxOffice": None, "Year": None}
+        print(f"⚠ API error for '{title}': {e}")
+        return {"director": None, "plot": None, "box_office": None, "year": None}
+
 
 def extract_data():
-    """Read local CSV files."""
+    """Extract movie and rating data from CSV files."""
+    print(" Extracting data from CSV files...")
     movies_df = pd.read_csv(MOVIES_CSV)
     ratings_df = pd.read_csv(RATINGS_CSV)
+    print("Data extracted successfully.")
     return movies_df, ratings_df
 
+
 def transform_data(movies_df, ratings_df):
-    """Clean, enrich, and merge data."""
-    print("Fetching additional movie data from OMDb API...")
-    omdb_details = []
+    """Transform and enrich data using OMDb API."""
+    print(" Enriching movie data with OMDb API...")
+    enriched_data = []
+
     for _, row in movies_df.iterrows():
-        details = get_omdb_data(row['title'])
-        omdb_details.append(details)
-        time.sleep(0.2)  # Avoid rate-limiting
+        title = row["title"]
+        omdb_info = get_omdb_data(title)
+        enriched_row = {
+            "title": title,
+            "genres": row.get("genres", "Unknown"),
+            "director": omdb_info["director"] or "Unknown",
+            "plot": omdb_info["plot"] or "Unknown",
+            "box_office": omdb_info["box_office"] or "Unknown",
+            "year": pd.to_numeric(omdb_info["year"], errors="coerce")
+        }
+        enriched_data.append(enriched_row)
+        time.sleep(0.2)  # Prevent hitting OMDb rate limits
 
-    omdb_df = pd.DataFrame(omdb_details)
-    movies_enriched = pd.concat([movies_df, omdb_df], axis=1)
+    movies_clean = pd.DataFrame(enriched_data)
+    ratings_df = ratings_df.rename(columns={"movieId": "movie_id"})
 
-    # Clean up columns
-    movies_enriched['Year'] = pd.to_numeric(movies_enriched['Year'], errors='coerce')
-    movies_enriched.fillna("Unknown", inplace=True)
+    print("Data transformed successfully.")
+    return movies_clean, ratings_df
 
-    return movies_enriched, ratings_df
 
 def load_data(movies_df, ratings_df):
     """Load data into SQLite database."""
+    print(" Loading data into SQLite database...")
     engine = create_engine(f"sqlite:///{DB_NAME}")
-    with engine.connect() as conn:
-        # Create tables if not exist
+
+    with engine.begin() as conn:
+        # Read the schema
         with open("schema.sql", "r") as f:
-            conn.execute(text(f.read()))
+            schema_sql = f.read()
+
+        # Execute SQL statements one at a time
+        for statement in schema_sql.strip().split(";"):
+            if statement.strip():
+                conn.exec_driver_sql(statement)
 
         # Load data
         movies_df.to_sql("movies", conn, if_exists="append", index=False)
         ratings_df.to_sql("ratings", conn, if_exists="append", index=False)
 
-        print("Data successfully loaded into database.")
+    print(" Data successfully loaded into database.")
+
 
 def main():
-    print("Starting ETL pipeline...")
+    print(" Starting ETL pipeline...")
     movies_df, ratings_df = extract_data()
     movies_clean, ratings_clean = transform_data(movies_df, ratings_df)
     load_data(movies_clean, ratings_clean)
-    print("ETL process completed successfully!")
+    print(" ETL process completed successfully!")
+
 
 if __name__ == "__main__":
     main()
@@ -281,6 +297,7 @@ Add Airflow or Prefect orchestration for automation.
 👨‍💻 Author
 
 Prepared for tsworks Data Engineering Assignment.
+
 
 
 
