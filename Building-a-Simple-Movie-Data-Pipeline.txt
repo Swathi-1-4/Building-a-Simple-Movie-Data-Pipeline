@@ -162,36 +162,64 @@ Idempotency: Drops & recreates schema before load (can be modified).
 📊 3. queries.sql
 -- queries.sql
 
--- 1. Movie with the highest average rating
-SELECT m.title, AVG(r.rating) AS avg_rating
+-- 1️ Movie with the highest average rating
+SELECT 
+    m.title, 
+    ROUND(AVG(r.rating), 2) AS avg_rating
 FROM ratings r
 JOIN movies m ON r.movie_id = m.movie_id
 GROUP BY m.title
 ORDER BY avg_rating DESC
 LIMIT 1;
 
--- 2. Top 5 genres by average rating
+
+-- 2️ Top 5 genres by average rating (SQLite FIXED VERSION)
 SELECT 
-    TRIM(genre) AS genre, 
-    AVG(r.rating) AS avg_rating
-FROM movies m
-JOIN ratings r ON m.movie_id = r.movie_id,
-     LATERAL split(m.genres, '|') AS genre
+    genre,
+    ROUND(AVG(rating), 2) AS avg_rating
+FROM (
+    SELECT 
+        r.rating,
+        CASE 
+            WHEN m.genres LIKE '%Action%' THEN 'Action'
+            WHEN m.genres LIKE '%Adventure%' THEN 'Adventure'
+            WHEN m.genres LIKE '%Comedy%' THEN 'Comedy'
+            WHEN m.genres LIKE '%Drama%' THEN 'Drama'
+            WHEN m.genres LIKE '%Romance%' THEN 'Romance'
+            WHEN m.genres LIKE '%Horror%' THEN 'Horror'
+            WHEN m.genres LIKE '%Thriller%' THEN 'Thriller'
+            WHEN m.genres LIKE '%Sci-Fi%' THEN 'Sci-Fi'
+            WHEN m.genres LIKE '%Animation%' THEN 'Animation'
+            ELSE 'Other'
+        END AS genre
+    FROM movies AS m
+    INNER JOIN ratings AS r
+        ON m.movie_id = r.movie_id
+)
 GROUP BY genre
 ORDER BY avg_rating DESC
 LIMIT 5;
 
--- 3. Director with most movies
-SELECT director, COUNT(*) AS movie_count
+
+-- 3️ Director with the most movies
+SELECT 
+    director, 
+    COUNT(*) AS movie_count
 FROM movies
+WHERE director IS NOT NULL 
+  AND director != 'Unknown'
 GROUP BY director
 ORDER BY movie_count DESC
 LIMIT 1;
 
--- 4. Average rating by year
-SELECT m.year, AVG(r.rating) AS avg_rating
+
+-- 4️ Average rating by year
+SELECT 
+    m.year, 
+    ROUND(AVG(r.rating), 2) AS avg_rating
 FROM ratings r
 JOIN movies m ON m.movie_id = r.movie_id
+WHERE m.year IS NOT NULL
 GROUP BY m.year
 ORDER BY m.year;
 
@@ -297,6 +325,7 @@ Add Airflow or Prefect orchestration for automation.
 👨‍💻 Author
 
 Prepared for tsworks Data Engineering Assignment.
+
 
 
 
